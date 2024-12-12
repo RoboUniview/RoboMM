@@ -4,7 +4,7 @@ MODEL:
   NUM_CLASSES: 1000
   TYPE: regnet
 NUM_GPUS: 8
-OUT_DIR: /workspace/group_share/adc-perception-pruning/lipy/exp/static_xnet/imagenet_pretrain/regnetx0.95G_self
+OUT_DIR: 
 PORT_RANGE:
 - 10000
 - 65000
