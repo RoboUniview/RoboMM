@@ -6,6 +6,7 @@ This is the unorganized version of the code for RoboMM: All-in-One Multimodal La
 
 > RoboMM: All-in-One Multimodal Large Model for Robotic Manipulation <br>
 > [Fen Yan](https://scholar.google.com.hk/citations?user=gO4divAAAAAJ&hl=zh-CN&oi=sra)\*, [Fanfan Liu](https://scholar.google.com/citations?user=LPaXZEUAAAAJ&hl=en)\*, [Liming Zheng](), [Yufeng Zhong](), [Yiyang Huang](), [Zechao Guan](), [Chenjian Feng](https://fcjian.github.io/), [Lin Ma](http://forestlinma.com/)† <br>
+> Email: [bphengyan@163.com](bphengyan@163.com)
 > *Equal Contribution   †Corresponding Authors
 
 In recent years, robotics has advanced significantly through the integration of larger models and large-scale datasets. However, challenges remain in applying these models to 3D spatial interactions and managing data collection costs. To address these issues, we propose the multimodal robotic manipulation model, **RoboMM**, along with the comprehensive dataset, **RoboData**.
@@ -44,6 +45,8 @@ bash tools/test.sh 8 ${ckpt}
 - [x] RoboMM evaluation code
 - [ ] RoboMM training data
 - [ ] RoboMM model
+
+## If you have any questions or issues, feel free to leave a comment or contact [bphengyan@163.com](bphengyan@163.com)
 
 ## Acknowledgment
 
