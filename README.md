@@ -43,7 +43,8 @@ bash tools/test.sh 8 ${ckpt}
 - [x] RoboMM traing code
 - [x] RoboMM inference code
 - [x] RoboMM evaluation code
-- [ ] RoboMM training data
+- [x] RoboMM five training data
+- [ ] RoboMM nine training data
 - [ ] RoboMM model
 
 ## If you have any questions or issues, feel free to leave a comment or contact [bphengyan@163.com](bphengyan@163.com)
