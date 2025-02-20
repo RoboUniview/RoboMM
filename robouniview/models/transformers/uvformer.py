@@ -174,9 +174,6 @@ class DeformableTransformer(nn.Module):
         self.reference_points_dict = {}
         self.reference_points_valid_dict = {}
         self.valid_weight_dict = {}
-        if self.is_onnx:
-            self.reference_points = torch.ones(1, self.uv_x * self.uv_y, self.num_cams * self.uv_z, 2)
-            self.valid_weight = torch.ones((1, self.uv_x * self.uv_y, 1)) * self.uv_z
         self.setup_input_proj()
 
         num_feature_levels = self.num_cams * self.num_input_feat * self.uv_z
@@ -261,30 +258,22 @@ class DeformableTransformer(nn.Module):
                 src = self.input_proj[str(cam_lvl)](src)  # B, C, H, W
                 pos_embed = encode_grid_to_emb2d(src.shape, src.device)  # B, C, H, W
                 spatial_shape = (h, w)
-                if self.is_onnx and self.norm == 'None':
-                    for i in range(src.size(0)):
-                        spatial_shapes.append(spatial_shape)
-                else:
-                    spatial_shapes.append(spatial_shape)
+              
+                spatial_shapes.append(spatial_shape)
 
                 mask = torch.zeros_like(src[:, 0, :, :]).bool()
                 mask = mask.flatten(1)
-                if self.is_onnx and self.norm == 'None':
-                    mask_flatten.append(mask.reshape(1, -1))
-                else:
-                    mask_flatten.append(mask)
+               
+                mask_flatten.append(mask)
 
                 src = src.flatten(2).transpose(1, 2)  # B, C, H, W --> B, C, H*W --> B, H*W, C
                 pos_embed = pos_embed.flatten(2).transpose(1, 2)  # B, C, H, W --> B, C, H*W --> B, H*W, C
                 lvl_pos_embed = pos_embed + self.cam_level_embed[cam_lvl].view(1, 1, -1) \
                                 + self.feat_level_embed[f].view(1, 1, -1)  # B, H*W, C
 
-                if self.is_onnx and self.norm == 'None':
-                    src_flatten.append(src.reshape(1, -1, src.size(-1)))
-                    pos_flatten.append(lvl_pos_embed.reshape(1, -1, lvl_pos_embed.size(-1)))
-                else:
-                    src_flatten.append(src)
-                    pos_flatten.append(lvl_pos_embed)
+               
+                src_flatten.append(src)
+                pos_flatten.append(lvl_pos_embed)
 
         src_flatten = torch.cat(src_flatten, 1)  # B, N*H*W, C
         pos_flatten = torch.cat(pos_flatten, 1)  # B, N*H*W, C
@@ -365,147 +354,7 @@ class DeformableTransformer(nn.Module):
         return reference_points, reference_points_valid, valid_weight
     
 
-    def save_reference_points(self, calib, ypr_jitter):
-        reference_points = []
-        reference_points_valid = []
-        for h in range(self.uv_z):
-            multifeat_points = []
-            multifeat_points_valid = []
-            for f in range(self.num_input_feat):
-                cam_points = []
-                cam_points_valid = []
-                for cam_id in ['rgb_gripper']:
-                    cam = cam_id
-                    intrinsic = calib[cam]['intrinsic_matrix'].detach().cpu().numpy()
-                    extrinsic = calib[cam]['extrinsic_matrix'].detach().cpu().numpy()
-                    distortion = calib[cam]['distCoeffs_matrix'].detach().cpu().numpy()
-                    if 'extrinsic_ypr' in calib[cam]:
-                        extrinsic_ypr = calib[cam]['extrinsic_ypr'].detach().cpu().numpy()
-                        new_yaw = extrinsic_ypr[0] + ypr_jitter[0]
-                        new_pitch = extrinsic_ypr[1] + ypr_jitter[1]
-                        new_roll = extrinsic_ypr[2] + ypr_jitter[2]
-                        rotation_matrix = euler_to_Rot(np.deg2rad(new_yaw), np.deg2rad(new_pitch),
-                                                       np.deg2rad(new_roll)).T
-                        extrinsic[0] = rotation_matrix[0].tolist() + [extrinsic[0][-1]]
-                        extrinsic[1] = rotation_matrix[1].tolist() + [extrinsic[1][-1]]
-                        extrinsic[2] = rotation_matrix[2].tolist() + [extrinsic[2][-1]]
-
-                    img_h, img_w, _ = self.global_config.original_image_shapes[cam_id]
-                    dist_cam_pt, valid = project_grid_image(self.uv_grid, intrinsic, extrinsic, distortion, img_h,
-                                                            img_w)
-                    dist_cam_pt = dist_cam_pt.astype(float)
-
-                    # if cam_id == 'cam2' and self.global_config.crop_cam2:
-                    #     method = self.global_config.crop_method
-                    #     dist_cam_pt[..., 0] = dist_cam_pt[..., 0] - method['left'] * self.orig_to_actual_img_ratio
-                    #     dist_cam_pt[..., 1] = dist_cam_pt[..., 1] - method['top'] * self.orig_to_actual_img_ratio
-                    #     img_w = img_w - (method['left'] + method['right']) * self.orig_to_actual_img_ratio
-                    #     img_h = img_h - (method['top'] + method['bottom']) * self.orig_to_actual_img_ratio
-
-                    dist_cam_pt[..., 0] = dist_cam_pt[..., 0] / img_w
-                    dist_cam_pt[..., 1] = dist_cam_pt[..., 1] / img_h
-                    dist_cam_pt_h = dist_cam_pt[:, :, h, :]
-                    valid = valid[:, :, :, None]
-                    valid_h = valid[:, :, h, :]
-                    # if 'virtual' in cam_id:
-                    #     if 'mask_around_ego' in dir(self.global_config):
-                    #         dim0_start = (self.front + self.rear) // 2 - self.global_config.mask_around_ego.top
-                    #         dim0_end = (self.front + self.rear) // 2 + self.global_config.mask_around_ego.bottom
-                    #         dim1_start = (self.left + self.right) // 2 - self.global_config.mask_around_ego.left
-                    #         dim1_end = (self.left + self.right) // 2 + self.global_config.mask_around_ego.right
-                    #         valid_h[dim0_start:dim0_end, dim1_start:dim1_end, :] = 0
-                    cam_points.append(dist_cam_pt_h[:, :, None])
-                    cam_points_valid.append(valid_h[:, :, None])
-
-                cam_points = np.concatenate(cam_points, axis=2)
-                cam_points_valid = np.concatenate(cam_points_valid, axis=2)
-                cam_points_valid = cam_points_valid.repeat(2, axis=3)
-                multifeat_points.append(cam_points)
-                multifeat_points_valid.append(cam_points_valid)
-
-            multifeat_points = np.concatenate(multifeat_points, axis=2)  # x, y, num_cam*z, uv
-            multifeat_points_valid = np.concatenate(multifeat_points_valid, axis=2)  # x, y, num_cam*z, uv
-            reference_points.append(multifeat_points)
-            reference_points_valid.append(multifeat_points_valid)
-        reference_points = np.concatenate(reference_points, axis=2)
-        np.save('/workspace/RoboFlamingo/rgb_gripper_reference_points.npy', reference_points)
-        np.save('/workspace/RoboFlamingo/uv_grid.npy', self.uv_grid)
-        
-        
-        reference_points_valid = np.concatenate(reference_points_valid, axis=2)
-        np.save('/workspace/RoboFlamingo/rgb_gripper_reference_points_valid.npy', reference_points_valid)
-        
-
-
-        # reference_points = []
-        # reference_points_valid = []
-        # for h in range(self.uv_z):
-        #     multifeat_points = []
-        #     multifeat_points_valid = []
-        #     for f in range(self.num_input_feat):
-        #         cam_points = []
-        #         cam_points_valid = []
-        #         for cam_id in ['rgb_static']:
-        #             cam = cam_id
-                    
-        #             intrinsic = calib[cam]['intrinsic_matrix'].detach().cpu().numpy()
-        #             extrinsic = calib[cam]['extrinsic_matrix'].detach().cpu().numpy()
-        #             distortion = calib[cam]['distCoeffs_matrix'].detach().cpu().numpy()
-        #             if 'extrinsic_ypr' in calib[cam]:
-        #                 extrinsic_ypr = calib[cam]['extrinsic_ypr'].detach().cpu().numpy()
-        #                 new_yaw = extrinsic_ypr[0] + ypr_jitter[0]
-        #                 new_pitch = extrinsic_ypr[1] + ypr_jitter[1]
-        #                 new_roll = extrinsic_ypr[2] + ypr_jitter[2]
-        #                 rotation_matrix = euler_to_Rot(np.deg2rad(new_yaw), np.deg2rad(new_pitch),
-        #                                                np.deg2rad(new_roll)).T
-        #                 extrinsic[0] = rotation_matrix[0].tolist() + [extrinsic[0][-1]]
-        #                 extrinsic[1] = rotation_matrix[1].tolist() + [extrinsic[1][-1]]
-        #                 extrinsic[2] = rotation_matrix[2].tolist() + [extrinsic[2][-1]]
-
-        #             img_h, img_w, _ = self.global_config.original_image_shapes[cam_id]
-        #             dist_cam_pt, valid = project_grid_image(self.uv_grid, intrinsic, extrinsic, distortion, img_h,
-        #                                                     img_w)
-        #             dist_cam_pt = dist_cam_pt.astype(float)
-
-        #             # if cam_id == 'cam2' and self.global_config.crop_cam2:
-        #             #     method = self.global_config.crop_method
-        #             #     dist_cam_pt[..., 0] = dist_cam_pt[..., 0] - method['left'] * self.orig_to_actual_img_ratio
-        #             #     dist_cam_pt[..., 1] = dist_cam_pt[..., 1] - method['top'] * self.orig_to_actual_img_ratio
-        #             #     img_w = img_w - (method['left'] + method['right']) * self.orig_to_actual_img_ratio
-        #             #     img_h = img_h - (method['top'] + method['bottom']) * self.orig_to_actual_img_ratio
-
-        #             dist_cam_pt[..., 0] = dist_cam_pt[..., 0] / img_w
-        #             dist_cam_pt[..., 1] = dist_cam_pt[..., 1] / img_h
-        #             dist_cam_pt_h = dist_cam_pt[:, :, h, :]
-        #             valid = valid[:, :, :, None]
-        #             valid_h = valid[:, :, h, :]
-        #             # if 'virtual' in cam_id:
-        #             #     if 'mask_around_ego' in dir(self.global_config):
-        #             #         dim0_start = (self.front + self.rear) // 2 - self.global_config.mask_around_ego.top
-        #             #         dim0_end = (self.front + self.rear) // 2 + self.global_config.mask_around_ego.bottom
-        #             #         dim1_start = (self.left + self.right) // 2 - self.global_config.mask_around_ego.left
-        #             #         dim1_end = (self.left + self.right) // 2 + self.global_config.mask_around_ego.right
-        #             #         valid_h[dim0_start:dim0_end, dim1_start:dim1_end, :] = 0
-        #             cam_points.append(dist_cam_pt_h[:, :, None])
-        #             cam_points_valid.append(valid_h[:, :, None])
-
-        #         cam_points = np.concatenate(cam_points, axis=2)
-        #         cam_points_valid = np.concatenate(cam_points_valid, axis=2)
-        #         cam_points_valid = cam_points_valid.repeat(2, axis=3)
-        #         multifeat_points.append(cam_points)
-        #         multifeat_points_valid.append(cam_points_valid)
-
-        #     multifeat_points = np.concatenate(multifeat_points, axis=2)  # x, y, num_cam*z, uv
-        #     multifeat_points_valid = np.concatenate(multifeat_points_valid, axis=2)  # x, y, num_cam*z, uv
-        #     reference_points.append(multifeat_points)
-        #     reference_points_valid.append(multifeat_points_valid)
-        # reference_points = np.concatenate(reference_points, axis=2)
-        # np.save('/workspace/RoboFlamingo/rgb_static_reference_points.npy', reference_points)
-        # reference_points_valid = np.concatenate(reference_points_valid, axis=2)
-        # np.save('/workspace/RoboFlamingo/rgb_static_reference_points_valid.npy', reference_points_valid)
-        
-        return 0, 0, 0
-
+    
     def forward(self, x, calib, lss_query_embed=None, depth_dist=None, forward_orig_query_embed=False):
         input_feat = []
         input_feat_size = 0
@@ -524,8 +373,7 @@ class DeformableTransformer(nn.Module):
                 bs, c, feat_h, feat_w = f.shape
                 input_feat_size += feat_h * feat_w
 
-        if self.is_onnx and self.norm == 'None':
-            bs = 1
+        
         src_flatten, pos_flatten, spatial_shapes, level_start_index = self.preprocess_input(input_feat) # input_feat[0][0]: [5*12, 1024,16,16] # 准备deformable输入包括，feat,pos,mask,size
 
         if not self.dynamic_query_embed:
@@ -543,85 +391,79 @@ class DeformableTransformer(nn.Module):
                 orig_query_embed = self.orig_query_embed.weight.unsqueeze(0).expand(bs, -1, -1)
                 tgt += orig_query_embed
 
-        if self.is_onnx:
-            reference_points = self.reference_points
-        else:
-            unpacked_calibs = unpack_calib(calib, bs)
-            reference_points, reference_points_valid, valid_weight = [], [], []
-            for i, curr_calib in enumerate(unpacked_calibs): # for bs
-                extrinsic_jitter = self.global_config.extrinsic_jitter
-                if extrinsic_jitter > 0:
-                    if self.transformer_config['reuse_ref_point']:
-                        # if reuse, we use the same ypr and bigger step
-                        step = 0.1
-                        all_choice = np.arange(start=-extrinsic_jitter, stop=extrinsic_jitter + step, step=step)
-                        jitter = round(np.random.choice(all_choice), 1)
-                        ypr_jitter = [jitter, jitter, jitter]
-                    else:
-                        step = 0.01
-                        all_choice = np.arange(start=-extrinsic_jitter, stop=extrinsic_jitter + step, step=step)
-                        yaw_jitter = round(np.random.choice(all_choice), 2)
-                        pitch_jitter = round(np.random.choice(all_choice), 2)
-                        roll_jitter = round(np.random.choice(all_choice), 2)
-                        ypr_jitter = [yaw_jitter, pitch_jitter, roll_jitter]
-                else:
-                    if hasattr(self.global_config, 'eval_jitter'):
-                        eval_jitter = self.global_config.eval_jitter
-                        ypr_jitter = [eval_jitter] * 3
-                    else:
-                        ypr_jitter = [0.0, 0.0, 0.0]
-
+     
+        unpacked_calibs = unpack_calib(calib, bs)
+        reference_points, reference_points_valid, valid_weight = [], [], []
+        for i, curr_calib in enumerate(unpacked_calibs): # for bs
+            extrinsic_jitter = self.global_config.extrinsic_jitter
+            if extrinsic_jitter > 0:
                 if self.transformer_config['reuse_ref_point']:
-                    vehicle_name_key = curr_calib['vehicle_name'] + '_%.1f' % ypr_jitter[0]
-                    if vehicle_name_key not in self.reference_points_dict.keys():
-                        curr_reference_points, curr_reference_points_valid, curr_valid_weight = \
-                            self.generate_reference_points(curr_calib, ypr_jitter)
-                        self.reference_points_dict[vehicle_name_key] = curr_reference_points
-                        self.reference_points_valid_dict[vehicle_name_key] = curr_reference_points_valid
-                        self.valid_weight_dict[vehicle_name_key] = curr_valid_weight
-                    else:
-                        curr_reference_points = self.reference_points_dict[vehicle_name_key]
-                        curr_reference_points_valid = self.reference_points_valid_dict[vehicle_name_key]
-                        curr_valid_weight = self.valid_weight_dict[vehicle_name_key]
+                    # if reuse, we use the same ypr and bigger step
+                    step = 0.1
+                    all_choice = np.arange(start=-extrinsic_jitter, stop=extrinsic_jitter + step, step=step)
+                    jitter = round(np.random.choice(all_choice), 1)
+                    ypr_jitter = [jitter, jitter, jitter]
                 else:
+                    step = 0.01
+                    all_choice = np.arange(start=-extrinsic_jitter, stop=extrinsic_jitter + step, step=step)
+                    yaw_jitter = round(np.random.choice(all_choice), 2)
+                    pitch_jitter = round(np.random.choice(all_choice), 2)
+                    roll_jitter = round(np.random.choice(all_choice), 2)
+                    ypr_jitter = [yaw_jitter, pitch_jitter, roll_jitter]
+            else:
+                if hasattr(self.global_config, 'eval_jitter'):
+                    eval_jitter = self.global_config.eval_jitter
+                    ypr_jitter = [eval_jitter] * 3
+                else:
+                    ypr_jitter = [0.0, 0.0, 0.0]
+
+            if self.transformer_config['reuse_ref_point']:
+                vehicle_name_key = curr_calib['vehicle_name'] + '_%.1f' % ypr_jitter[0]
+                if vehicle_name_key not in self.reference_points_dict.keys():
                     curr_reference_points, curr_reference_points_valid, curr_valid_weight = \
                         self.generate_reference_points(curr_calib, ypr_jitter)
-                    
+                    self.reference_points_dict[vehicle_name_key] = curr_reference_points
+                    self.reference_points_valid_dict[vehicle_name_key] = curr_reference_points_valid
+                    self.valid_weight_dict[vehicle_name_key] = curr_valid_weight
+                else:
+                    curr_reference_points = self.reference_points_dict[vehicle_name_key]
+                    curr_reference_points_valid = self.reference_points_valid_dict[vehicle_name_key]
+                    curr_valid_weight = self.valid_weight_dict[vehicle_name_key]
+            else:
+                curr_reference_points, curr_reference_points_valid, curr_valid_weight = \
+                    self.generate_reference_points(curr_calib, ypr_jitter)
+                
 
 
-                    # if i ==0:
-                    #     curr_reference_points2, curr_reference_points_valid2, curr_valid_weight2 = \
-                    #         self.save_reference_points(curr_calib, ypr_jitter)
-                reference_points.append(curr_reference_points)
-                reference_points_valid.append(curr_reference_points_valid)
-                valid_weight.append(curr_valid_weight)
+                # if i ==0:
+                #     curr_reference_points2, curr_reference_points_valid2, curr_valid_weight2 = \
+                #         self.save_reference_points(curr_calib, ypr_jitter)
+            reference_points.append(curr_reference_points)
+            reference_points_valid.append(curr_reference_points_valid)
+            valid_weight.append(curr_valid_weight)
 
-            reference_points = torch.stack([i.to(src_flatten.device) for i in reference_points], dim=0)
-            reference_points_valid = torch.stack([i.to(src_flatten.device) for i in reference_points_valid], dim=0)
-            valid_weight = torch.stack([i.to(src_flatten.device) for i in valid_weight], dim=0)
-            reference_points[~reference_points_valid] = -99
+        reference_points = torch.stack([i.to(src_flatten.device) for i in reference_points], dim=0)
+        reference_points_valid = torch.stack([i.to(src_flatten.device) for i in reference_points_valid], dim=0)
+        valid_weight = torch.stack([i.to(src_flatten.device) for i in valid_weight], dim=0)
+        reference_points[~reference_points_valid] = -99
 
         n_ref = self.uv_z
         spatial_shapes = spatial_shapes.repeat(n_ref, 1)
-        if self.is_onnx:
-            level_start_index = level_start_index.repeat(n_ref, 1)
-        else:
-            n_ref = self.uv_z
-            src_flatten = src_flatten.repeat(1, n_ref, 1)
-            tmp = []
-            for i in range(n_ref):
-                next_rp_level_start_index = (level_start_index + i * input_feat_size).clone().detach()
-                tmp.append(next_rp_level_start_index)
-            level_start_index = torch.cat(tmp)
+      
+        n_ref = self.uv_z
+        src_flatten = src_flatten.repeat(1, n_ref, 1)
+        tmp = []
+        for i in range(n_ref):
+            next_rp_level_start_index = (level_start_index + i * input_feat_size).clone().detach()
+            tmp.append(next_rp_level_start_index)
+        level_start_index = torch.cat(tmp)
 
 
 
         hs = self.decoder(tgt, reference_points, src_flatten, spatial_shapes, level_start_index, query_embed)
 
-        if self.is_onnx:
-            hs = hs / self.valid_weight
-        else:
-            hs = hs / valid_weight
+       
+        hs = hs / valid_weight
 
         uv_feat = hs.permute(0, 2, 1).contiguous()  # b, c, hw
         uv_feat = uv_feat.reshape(bs, c, self.uv_x, self.uv_y)
