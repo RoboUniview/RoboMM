@@ -106,18 +106,9 @@ class MSDeformAttn(nn.Module):
         if self.global_config.precision == 'fp16':
             sampling_locations = sampling_locations.half()
             attention_weights = attention_weights.half()
-        if self.is_onnx:
-            """"Pseudo operation for deform_atten"""
-            # Todo: onnx supported grid sample (https://github.com/open-mmlab/mmcv/blob/e5d9ef5285b2ff09df9b93bdca1045bd9ff58bcb/mmcv/ops/point_sample.py#L14)
-            sampling_locations = sampling_locations.reshape(1, reference_points.shape[1], -1)
-            attention_weights = attention_weights.reshape(1, reference_points.shape[1], -1)
-            output = torch.cat(
-                [value[:, :reference_points.shape[1], ...].flatten(2, 3), sampling_locations, attention_weights],
-                dim=2)[:, :, :self.d_model]
-            # output = ms_deform_attn_core_pytorch_onnx(value, input_spatial_shapes, input_level_start_index, sampling_locations, attention_weights, self.im2col_step)
-        else:
-            output = MSDeformAttnFunction.apply(
-                value, input_spatial_shapes, input_level_start_index, sampling_locations, attention_weights,
-                self.im2col_step)
+       
+        output = MSDeformAttnFunction.apply(
+            value, input_spatial_shapes, input_level_start_index, sampling_locations, attention_weights,
+            self.im2col_step)
         output = self.output_proj(output)
         return output
