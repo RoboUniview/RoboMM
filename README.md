@@ -24,6 +24,13 @@ Its design significantly enhances robotic manipulation performance, increasing t
 ## :fire: Updates
 - **2024.12**: We release RoboMM paper on arxiv！We release the training and inference code!
 
+## Installation
+```
+git clone https://github.com/RoboUniview/RoboMM.git
+conda env create -f environment.yml
+conda activate RBMM214
+```
+See [train.sh](https://github.com/RoboUniview/RoboMM/blob/main/tools/train.sh) for the system environment configuration of different simulators.
 
 ## Training the model (using DDP):
 Currently, the Calvin data has been fully uploaded, and RoboMM can now be trained using only the Calvin dataset
