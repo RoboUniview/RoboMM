@@ -292,6 +292,12 @@ def create_model_and_transforms(
     if hasattr(model, 'alignment_layer_gripper'):   model.alignment_layer_gripper.requires_grad_(True)
     if hasattr(model, 'petr'):                      model.petr.requires_grad_(True)
 
+    if hasattr(model, 'vlm'): 
+        # model.vlm.requires_grad_(True)
+        # model.vlm.gated_cross_attn_layers.requires_grad_(True)
+        model.vlm.get_input_embeddings().requires_grad_(True) # 需要更新embedding
+        model.vlm_perceiver.requires_grad_(True) # 需要更新视觉特征到语言特征的映射
+
     if "UVFormer" not in args.fusion_mode: # 注意此处，当不使用UVFormer的时候，occ_decoder和Upsample2d_3d必须训练
         model.rgb.requires_grad_(True)
         model.gripper.requires_grad_(True)

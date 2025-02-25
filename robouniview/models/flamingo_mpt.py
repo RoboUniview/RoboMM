@@ -190,6 +190,8 @@ class MPTFlamingo(nn.Module):
                     cross_attn_every_n_layers=cross_attn_every_n_layers,
                     gradient_checkpointing=False,
                 )
+        self.vlm = copy.deepcopy(self.lang_encoder)
+        self.vlm_perceiver = copy.deepcopy(self.perceiver)
 
         if sep_resampler:
             self.perceiver_gripper = PerceiverResampler(dim=self.vis_dim)
@@ -339,7 +341,7 @@ class MPTFlamingo(nn.Module):
                 kwarg['query_mask_matrix'] = query_mask_matrix
         if TESTTIME: ed_ecd_yf = time.time(); print(f"YF: image encoder {ed_ecd_yf-st_yf}")
         if self.train_action:
-            output = self.lang_encoder(
+            output = self.vlm(
                 input_ids=lang_x,
                 attention_mask=attention_mask.bool(),
                 past_key_values=past_key_values,
@@ -348,6 +350,24 @@ class MPTFlamingo(nn.Module):
                 **kwarg,
             )
             output_hs = output.hidden_states[-1] # YF: 3*505*2048
+            b, t, d = output_hs.shape
+            mask_indices = action_mask.nonzero(as_tuple=True) # 获取掩码为True的元素及其索引
+            action_feature = output_hs[mask_indices[0], mask_indices[1]] # 根据掩码从output_hs中选值; 288*20248
+            action_feature = rearrange(action_feature, "(B T) D -> B T D", B=b) # 8表示8个token
+
+            vla_lang_x = torch.tensor([self.media_token_id, 50310, 50279]*action_feature.shape[1]+[0], dtype=lang_x.dtype, device=action_feature.device).view(1, -1).repeat(len(action_feature), 1) # 此处方便期间先试用数据。50310表示需要替换为输入特征，50279位read out token
+            action_feature = repeat(action_feature, "B T D -> (B N T) D", N = 1)
+            kwarg = {"repeat": {"repeat_id":50310, "repeat_feature":action_feature}}
+            output = self.lang_encoder(
+                input_ids=vla_lang_x,
+                attention_mask=None,
+                past_key_values=None,
+                use_cache=False,
+                output_hidden_states=True,
+                **kwarg,
+            )
+            output_hs = output.hidden_states[-1] # YF: 3*505*2048
+            action_mask = vla_lang_x==50279
             b, t, d = output_hs.shape
             
             if TESTTIME: ed_fd_yf = time.time(); print(f"YF: lang forward {ed_fd_yf-ed_ecd_yf}")
@@ -578,6 +598,14 @@ class MPTFlamingo(nn.Module):
             vision_rgb = self._encode_vision(vision_rgb).to(dtype)
             vision_gripper = self._encode_vision(vision_gripper).to(dtype)
         B, T, F, HxW, C = vision_rgb.shape
+
+        if 1:
+            vlm_vision_rgb = self.vlm_perceiver(vision_rgb)  # B T HW C
+            vlm_vision_gripper = self.vlm_perceiver(vision_gripper)
+
+            vlm_vision_x = torch.cat([vlm_vision_rgb, vlm_vision_gripper], dim=2)  # reshapes to (b, T, 2*n, d)
+            for layer in self.vlm._get_decoder_layers():
+                layer.condition_vis_x(vlm_vision_x)
 
         vision_rgb = rearrange(vision_rgb, " B T F (H W) C  -> (B T F) C H W", H=16, W=16)
         vision_gripper = rearrange(vision_gripper, " B T F (H W) C  -> (B T F) C H W", H=16, W=16)
