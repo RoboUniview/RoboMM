@@ -27,6 +27,7 @@ Its design significantly enhances robotic manipulation performance, increasing t
 ## Installation
 ```
 git clone https://github.com/RoboUniview/RoboMM.git
+cd RoboMM
 conda env create -f environment.yml
 conda activate RBMM214
 ```
