@@ -203,7 +203,6 @@ dependencies:
     - matplotlib-inline==0.1.7
     - mdurl==0.1.2
     - mistune==3.0.2
-    - multiscaledeformableattention==1.0
     - natsort==8.4.0
     - nbclient==0.10.0
     - nbconvert==7.16.4
