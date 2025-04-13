@@ -30,6 +30,10 @@ git clone https://github.com/RoboUniview/RoboMM.git
 cd RoboMM
 conda env create -f environment.yml
 conda activate RBMM214
+cd ..
+git clone https://github.com/fundamentalvision/Deformable-DETR.git
+cd Deformable-DETR/models/ops
+pip install .
 ```
 See [train.sh](https://github.com/RoboUniview/RoboMM/blob/main/tools/train.sh) for the system environment configuration of different simulators.
 
