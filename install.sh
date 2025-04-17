@@ -19,4 +19,5 @@ wget --no-check-certificate https://downloads.coppeliarobotics.com/V4_1_0/Coppel
 mkdir -p $COPPELIASIM_ROOT && tar -xf CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz -C $COPPELIASIM_ROOT --strip-components 1
 rm -rf CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz
 pip install git+https://github.com/stepjam/RLBench.git
+pip install pytorch-lightning==1.8.6
 
