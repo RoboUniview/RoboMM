@@ -18,11 +18,11 @@ only_single_task: false
 sample_mode: 1   # -1是随机选择token排列方式；0表示image+action；1表示action；2表示OCC+action；3表示：image+OCC+action; 4表示：OCC+iamge+action
 env_resample: false
 rotate: true
-data_type: [calvin,metaworld,libero,robomimic,robocasa]
+data_type: [calvin]
 data_eval: [calvin] # 哪个数据集拿来评估
 data_path_list: [[/data/new_calvin_D_1],[],[],[],[]]
 state_matrixs_path:  ["/data/new_calvin_D_1","","","",""]
-calvin_dataset: [/data/robotics/task_D_D,/data/robotics/metaworld_uniview_unzip/,/data/robotics/libero_uniview_final,/data/robotics/robomimic_uniview,/data/robotics/robocasa_uniview_unzip]
+calvin_dataset: [/data/robotics/task_D_D]
 loss_weight: {occ: 0.1, action: 1}
 validation: false
 bevformer_config: bevformer_config/bevformer_b_s_rotate.yaml
@@ -73,11 +73,11 @@ vision_encoder_path: ViT-L-14
 replan: -1
 visualize: false
 vision_encoder_pretrained: openai
-lm_path: /project/robotic/RoboFlamingo/checkpoints/mpt-1b-redpajama-200b-dolly
-calvin_conf_path: /project/robotic/calvin/calvin_models/conf
+lm_path: /disk2/huangyiyang/modelzoo/anas-awadalla/mpt-1b-redpajama-200b-dolly
+calvin_conf_path: /disk2/huangyiyang/project/calvin/calvin_models/conf
 batch_size_sim: 1
-calvin_seq_path: /project/robotic/RoboFlamingo/eval_sequences.json
-tokenizer_path: /project/robotic/RoboFlamingo/checkpoints/mpt-1b-redpajama-200b-dolly
+calvin_seq_path: /disk0/home/huangyiyang/project/RoboFlamingo/eval_sequences.json
+tokenizer_path: /disk2/huangyiyang/modelzoo/anas-awadalla/mpt-1b-redpajama-200b-dolly
 reset: false
 diverse_inst: false
 future_act_len: -1
@@ -86,7 +86,7 @@ run_name: RobotFlamingoDBG
 use_media_placement_augmentation: false
 offline: false
 logging_steps: 100
-clip_cache_dir: /project/robotic/RoboFlamingo/checkpoints
+clip_cache_dir: /disk2/huangyiyang/modelzoo
 gradient_accumulation_steps: 1
 openflamingo_checkpoint: /project/robotic/RoboFlamingo/checkpoints/OpenFlamingo-3B-vitl-mpt1b-langinstruct/checkpoint.pt
 delete_previous_checkpoint: false
@@ -96,7 +96,7 @@ warmup_steps: 1000
 local_rank: 0
 weight_decay: 0.1
 precision: fp32
-workers: 8
+workers: 4
 train_num_samples_calvin: 100
 dataset_resampled: true
 dist_url: env://

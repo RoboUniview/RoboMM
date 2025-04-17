@@ -133,6 +133,7 @@ dependencies:
   - zlib=1.2.13=h5eee18b_1
   - zstd=1.5.5=hc292b87_2
   - pip:
+    - setuptools==57.5.0
     - absl-py==2.1.0
     - addict==2.4.0
     - antlr4-python3-runtime==4.9.3
@@ -203,7 +204,6 @@ dependencies:
     - matplotlib-inline==0.1.7
     - mdurl==0.1.2
     - mistune==3.0.2
-    - multiscaledeformableattention==1.0
     - natsort==8.4.0
     - nbclient==0.10.0
     - nbconvert==7.16.4
@@ -238,10 +238,8 @@ dependencies:
     - pycls==0.1.1
     - pycparser==2.22
     - pygments==2.18.0
-    - pyhash==0.9.3
     - pyparsing==3.1.4
     - pyquaternion==0.9.9
-    - pyrep==4.1.0.3
     - python-dateutil==2.9.0.post0
     - pytorch3d==0.3.0
     - pytz==2024.2
@@ -251,7 +249,6 @@ dependencies:
     - requests-oauthlib==2.0.0
     - retrying==1.3.4
     - rich==13.8.1
-    - rlbench==1.2.0
     - rpds-py==0.20.0
     - rsa==4.9
     - safetensors==0.4.5
