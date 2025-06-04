@@ -34,10 +34,10 @@ See [train.sh](https://github.com/RoboUniview/RoboMM/blob/main/tools/train.sh) f
 
 ## Training the model (using DDP):
 Download the data from [Data](https://huggingface.co/datasets/liufanfanlff/RoboData) and extract it. Modify the corresponding paths in the config file and use the following files for training. If you just want to download the Calvin data, you can use the following method with the huggingface-cli download command: 
-'''
+```
 huggingface-cli download --repo-type dataset --resume-download liufanfanlff/RoboData  --include "calvin*"  --local-dir RoboData
 cat ./calvin_task_D_D_part_* > calvin_task_D_D.tar.gz
-'''
+```
 ```
 bash tools/train.sh 8 --config ${config}
 
