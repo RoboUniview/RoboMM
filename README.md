@@ -39,7 +39,7 @@ huggingface-cli download --repo-type dataset --resume-download liufanfanlff/Robo
 cat ./calvin_task_D_D_part_* > calvin_task_D_D.tar.gz
 ```
 ```
-bash tools/train.sh 8 --config ${config}
+bash tools/train.sh 8 ${config}
 
 ```
 
